@@ -41,7 +41,12 @@ end
 
 function generateRequest()
 	request_content.coffee = math.random(100)
-	request_content.milk = math.random(100 - request_content.coffee)
+	local next_upper = 100 - request_content.coffee
+	if next_upper > 0 then
+		request_content.milk = math.random(next_upper)
+	else
+		request_content.milk = 0
+	end
 	request_content.cream = 100 - request_content.coffee - request_content.milk
 end
 
