@@ -7,15 +7,25 @@ local item_types = {
 	CUP = {}
 }
 
+local game_states = {
+	START = {},
+	GAME = {},
+	OVER = {},
+}
+
+local state = game_states.START
+
 local HAND_MIN_X = -384
 local BUY_DRAWER_WIDTH = 90
 local TABLE_HEIGHT = 400
 
-local money = 10
+local money = 15
+local total_earned = 0
 
 local request_drink = true
 local request_content = { milk = 0, cream = 0, coffee = 0 }
 local hand_x = HAND_MIN_X
+local patience = 100
 
 local buy_drawer_x = BUY_DRAWER_WIDTH
 
@@ -53,6 +63,20 @@ function pour(to)
 	end
 end
 
+function initGame()
+	state = game_states.GAME
+	items = {}
+	grabbed_item = nil
+	buy_drawer_x = BUY_DRAWER_WIDTH
+	hand_x = HAND_MIN_X
+	patience = 100
+	request_drink = true
+	request_content = { milk = 0, cream = 0, coffee = 0 }
+	money = 15
+	total_earned = 0
+	generateRequest()
+end
+
 function love.load()
 	cup_empty_rsrc = love.graphics.newImage("assets/cup_empty.png")
 	cup_full_rsrc = love.graphics.newImage("assets/cup_full.png")
@@ -69,46 +93,56 @@ function love.load()
     love.graphics.setFont(font)
 	--love.graphics.setNewFont(12)
 	love.graphics.setBackgroundColor(.772,.647,.529)
-	generateRequest()
+	math.randomseed(os.time())
 end
 
 function love.mousepressed(x, y, button, istouch)
 	if button == 1 then
-		if isBuyActive() then
-			if grabbed_item ~= nil then
-				grabbed_item = nil
+		if state == game_states.GAME then
+			if isBuyActive() then
+				if grabbed_item ~= nil then
+					grabbed_item = nil
+				else
+					if y > 50 and y < 50 + 64 and money >= 1 then
+						money = money - 1
+						grabbed_item = Item(x, y, 100, 0, item_types.CUP, cup_empty_rsrc)
+					elseif y > 50 * 2 + 64 and y < 50 * 2 + 64 * 2 and money >= 5 then
+						money = money - 5
+						grabbed_item = Item(x, y, 300, 300, item_types.COFFEE, jug_full_rsrc)
+					elseif y > 50 * 3 + 64 * 2 and y < 50 * 3 + 64 * 2 + 96 and money >= 3 then
+						money = money - 3
+						grabbed_item = Item(x, y, 100, 100, item_types.MILK, milk_rsrc)
+					elseif y > 50 * 4 + 64 * 2 + 96 and y < 50 * 4 + 64 * 2 + 96 * 2 and money >= 3 then
+						money = money - 3
+						grabbed_item = Item(x, y, 100, 100, item_types.CREAM, cream_rsrc)
+					end
+				end
 			else
-				if y > 50 and y < 50 + 64 then
-					grabbed_item = Item(x, y, 100, 0, item_types.CUP, cup_empty_rsrc)
-				elseif y > 50 * 2 + 64 and y < 50 * 2 + 64 * 2 then
-					grabbed_item = Item(x, y, 300, 300, item_types.COFFEE, jug_full_rsrc)
-				elseif y > 50 * 3 + 64 * 2 and y < 50 * 3 + 64 * 2 + 96 then
-					grabbed_item = Item(x, y, 100, 100, item_types.MILK, milk_rsrc)
-				elseif y > 50 * 4 + 64 * 2 + 96 and y < 50 * 4 + 64 * 2 + 96 * 2 then
-					grabbed_item = Item(x, y, 100, 100, item_types.CREAM, cream_rsrc)
+				if grabbed_item ~= nil then
+					table.insert(items, grabbed_item)
+					grabbed_item = nil
+				else
+					local index_to_grab = 0
+					for i, item in ipairs(items) do
+						if x >= item.x and x <= item.x + item.rsrc:getWidth() and
+							y >= item.y and y <= item.y + item.rsrc:getHeight() then
+							index_to_grab = i
+						end
+					end
+					grabbed_item = items[index_to_grab]
+					table.remove(items, index_to_grab)
 				end
 			end
 		else
-			if grabbed_item ~= nil then
-				table.insert(items, grabbed_item)
-				grabbed_item = nil
-			else
-				local index_to_grab = 0
-				for i, item in ipairs(items) do
-					if x >= item.x and x <= item.x + item.rsrc:getWidth() and
-						y >= item.y and y <= item.y + item.rsrc:getHeight() then
-						index_to_grab = i
-					end
-				end
-				grabbed_item = items[index_to_grab]
-				table.remove(items, index_to_grab)
-			end
+			initGame()
 		end
 	end
 end
 
 function love.update(dt)
-	local mouse_x = love.mouse.getX()
+	if state ~= game_states.GAME then
+		return
+	end
 	if isBuyActive() then
 		buy_drawer_x = math.max(buy_drawer_x - drawer_speed, 0)
 	else
@@ -151,7 +185,13 @@ function love.update(dt)
 		end
 	end
 	if item_to_remove > 0 then
+		earning_ratio = 100 - math.abs(items[item_to_remove].content.milk - request_content.milk) +
+			math.abs(items[item_to_remove].content.cream - request_content.cream) +
+			math.abs(items[item_to_remove].content.coffee - request_content.coffee)
 		table.remove(items, item_to_remove)
+		earnings = (earning_ratio + patience) / 200 * 5
+		money = money + earnings
+		total_earned = total_earned + earnings
 	end
 
 	if grabbed_item ~= nil and grabbed_item.is_pouring then
@@ -173,45 +213,67 @@ function love.update(dt)
 	if not request_drink and hand_x == HAND_MIN_X then
 		request_drink = true
 		generateRequest()
+		patience = 100
+	end
+
+	patience = patience - 0.1
+	if patience <= 0 then
+		patience = 0
+		request_drink = false
+		state = game_states.OVER
 	end
 end
 
 function love.draw()
-	-- draw table
-	love.graphics.setColor(0.282, 0.188, 0.157)
-	love.graphics.rectangle("fill", 0, TABLE_HEIGHT, 800, 300, 10, 10)
+	if state == game_states.GAME then
+		love.graphics.setColor(0.282, 0.188, 0.157)
+		love.graphics.rectangle("fill", 0, TABLE_HEIGHT, 800, 300, 10, 10)
 
-	love.graphics.setColor(1, 1, 1, 1)
-	love.graphics.draw(hand_rsrc, hand_x, 150)
-	love.graphics.draw(cup_empty_rsrc, 725 + buy_drawer_x, 50)
-	love.graphics.draw(jug_full_rsrc, 710 + buy_drawer_x, 50 * 2 + 64)
-	love.graphics.draw(milk_rsrc, 720 + buy_drawer_x, 50 * 3 + 64 * 2)
-	love.graphics.draw(cream_rsrc, 720 + buy_drawer_x, 50 * 4 + 64 * 2 + 96)
+		love.graphics.setColor(1, 1, 1, 1)
+		love.graphics.draw(hand_rsrc, hand_x, 150)
+		love.graphics.draw(cup_empty_rsrc, 725 + buy_drawer_x, 50)
+		love.graphics.draw(jug_full_rsrc, 710 + buy_drawer_x, 50 * 2 + 64)
+		love.graphics.draw(milk_rsrc, 720 + buy_drawer_x, 50 * 3 + 64 * 2)
+		love.graphics.draw(cream_rsrc, 720 + buy_drawer_x, 50 * 4 + 64 * 2 + 96)
 
-	--love.graphics.setNewFont(16)
-	love.graphics.setColor(0.8, 0, 0)
-	love.graphics.print("1", 740 + buy_drawer_x, 50 + 64 + 12)
-	love.graphics.print("5", 740 + buy_drawer_x, 50 * 2 + 64 * 2 + 12)
-	love.graphics.print("3", 740 + buy_drawer_x, 50 * 3 + 64 * 2 + 96 + 12)
-	love.graphics.print("3", 740 + buy_drawer_x, 50 * 4 + 64 * 2 + 96 * 2 + 12)
+		love.graphics.setColor(0.8, 0, 0)
+		love.graphics.print("1", 740 + buy_drawer_x, 50 + 64 + 12)
+		love.graphics.print("5", 740 + buy_drawer_x, 50 * 2 + 64 * 2 + 12)
+		love.graphics.print("3", 740 + buy_drawer_x, 50 * 3 + 64 * 2 + 96 + 12)
+		love.graphics.print("3", 740 + buy_drawer_x, 50 * 4 + 64 * 2 + 96 * 2 + 12)
 
-	--love.graphics.setNewFont(36)
-	love.graphics.setColor(0, 0.9, 0)
-	love.graphics.print(money, 20, 20)
-	--love.graphics.setNewFont(24)
-	love.graphics.setColor(1, 1, 1)
-	love.graphics.print("GIMME " .. request_content.coffee .. "% COFFEE, " .. request_content.milk .. "% MILK, AND " .. request_content.cream .. "% CREAM!",
-		20, 75)
+		love.graphics.setColor(0, 0.9, 0)
+		love.graphics.print(money, 20, 20)
+		love.graphics.print("Total money earned: +" .. total_earned, 20, 40)
+		love.graphics.setColor(1, 1, 1)
+		love.graphics.print("Buy", 725, 10)
+		love.graphics.print("Here", 725, 25)
+		love.graphics.print("Garbage", 725, 560)
+		love.graphics.print("Here", 725, 575)
+		love.graphics.print("GIMME " .. request_content.coffee .. "% COFFEE, " .. request_content.milk .. "% MILK, AND " .. request_content.cream .. "% CREAM!",
+			20, 125)
+		love.graphics.setColor(0.9, 0, 0)
+		love.graphics.print("Patience: " .. math.ceil(patience) .. "%", 20, 100)
 
-	--love.graphics.setNewFont(12)
-	for _, item in ipairs(items) do
-		love.graphics.draw(item.rsrc, item.x, item.y)
-		love.graphics.print(item.amount, item.x, item.y + item.rsrc:getHeight())
-	end
+		love.graphics.setColor(1, 1, 1, 1)
+		for _, item in ipairs(items) do
+			love.graphics.draw(item.rsrc, item.x, item.y)
+			love.graphics.print(item.amount, item.x, item.y + item.rsrc:getHeight())
+		end
 
-	-- love.graphics.print(love.mouse:getX() .. " " .. love.mouse:getY(), 0 ,0)
+		-- love.graphics.print(love.mouse:getX() .. " " .. love.mouse:getY(), 0 ,0)
 
-	if grabbed_item ~= nil then
-		love.graphics.draw(grabbed_item.rsrc, grabbed_item.x, grabbed_item.y, grabbed_item.r)
+		if grabbed_item ~= nil then
+			love.graphics.draw(grabbed_item.rsrc, grabbed_item.x, grabbed_item.y, grabbed_item.r)
+		end
+	elseif state == game_states.START then
+		love.graphics.print("You own Cafe Keopi and you need to feed your family.", 150, 300)
+		love.graphics.print("Serve as many customers as possible before they lose their patience.", 150, 315)
+		love.graphics.print("Left click to start.", 150, 330)
+	elseif state == game_states.OVER then
+		love.graphics.print("You've earned " .. total_earned .. " dollars in total.", 250, 300)
+		love.graphics.print("You ended up with " .. money .. " dollars", 250, 315)
+		love.graphics.print("Your family starves.", 250, 330)
+		love.graphics.print("Left click to start anew.", 250, 345)
 	end
 end
