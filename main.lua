@@ -68,6 +68,16 @@ function pour(to)
 	end
 end
 
+function printAmount(item)
+	if item.amount == 0 then
+		love.graphics.print("EMPTY", item.x, item.y + item.rsrc:getHeight())
+	elseif item.amount == item.capacity then
+		love.graphics.print("FULL", item.x, item.y + item.rsrc:getHeight())
+	else
+		love.graphics.print(item.amount, item.x, item.y + item.rsrc:getHeight())
+	end
+end
+
 function initGame()
 	state = game_states.GAME
 	items = {}
@@ -263,13 +273,14 @@ function love.draw()
 		love.graphics.setColor(1, 1, 1, 1)
 		for _, item in ipairs(items) do
 			love.graphics.draw(item.rsrc, item.x, item.y)
-			love.graphics.print(item.amount, item.x, item.y + item.rsrc:getHeight())
+			printAmount(item)
 		end
 
 		-- love.graphics.print(love.mouse:getX() .. " " .. love.mouse:getY(), 0 ,0)
 
 		if grabbed_item ~= nil then
 			love.graphics.draw(grabbed_item.rsrc, grabbed_item.x, grabbed_item.y, grabbed_item.r)
+			printAmount(grabbed_item)
 		end
 	elseif state == game_states.START then
 		love.graphics.print("You own Cafe Keopi and you need to feed your family.", 150, 300)
