@@ -34,6 +34,7 @@ local hand_speed = 10
 
 local items = {}
 local grabbed_item = nil
+local is_pouring = false
 
 function isBuyActive()
 	return love.mouse.getX() > 680
@@ -52,7 +53,7 @@ end
 
 function pour(to)
 	if to.amount < to.capacity and grabbed_item.amount > 0 then
-		grabbed_item.is_pouring = true
+		is_pouring = true
 		grabbed_item.amount = grabbed_item.amount - 1
 		to.amount = math.min(to.amount + 1, to.capacity)
 		if grabbed_item.type == item_types.COFFEE then
@@ -69,12 +70,16 @@ function pour(to)
 end
 
 function printAmount(item)
+	local y = item.y
+	if not is_pouring then
+		y = y + item.rsrc:getHeight()
+	end
 	if item.amount == 0 then
-		love.graphics.print("EMPTY", item.x, item.y + item.rsrc:getHeight())
+		love.graphics.print("EMPTY", item.x, y)
 	elseif item.amount == item.capacity then
-		love.graphics.print("FULL", item.x, item.y + item.rsrc:getHeight())
+		love.graphics.print("FULL", item.x, y)
 	else
-		love.graphics.print(item.amount, item.x, item.y + item.rsrc:getHeight())
+		love.graphics.print(item.amount, item.x, y)
 	end
 end
 
@@ -89,6 +94,7 @@ function initGame()
 	request_content = { milk = 0, cream = 0, coffee = 0 }
 	money = 15
 	total_earned = 0
+	is_pouring = false
 	generateRequest()
 end
 
@@ -172,7 +178,7 @@ function love.update(dt)
 	if grabbed_item ~= nil then
 		grabbed_item.x = love.mouse.getX() - grabbed_item.rsrc:getWidth() / 2
 		grabbed_item.y = love.mouse.getY() - grabbed_item.rsrc:getHeight() / 2
-		grabbed_item.is_pouring = false
+		is_pouring = false
 	end
 
 	local item_to_remove = 0
@@ -209,12 +215,12 @@ function love.update(dt)
 		total_earned = total_earned + earnings
 	end
 
-	if grabbed_item ~= nil and grabbed_item.is_pouring then
+	if grabbed_item ~= nil and is_pouring then
 		grabbed_item.r = math.max(grabbed_item.r - 0.2, - math.pi / 2)
 		if grabbed_item.type == item_types.COFFEE then
 			grabbed_item.rsrc = jug_pouring_rsrc
 		end
-	elseif grabbed_item ~= nil and not grabbed_item.is_pouring then
+	elseif grabbed_item ~= nil and not is_pouring then
 		grabbed_item.r = math.min(grabbed_item.r + 0.2, 0)
 		if grabbed_item.type == item_types.COFFEE then
 			if grabbed_item.amount > 0 and grabbed_item.type == item_types.COFFEE then

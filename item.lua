@@ -12,7 +12,6 @@ function Item:init(x, y, capacity, amount, type, rsrc)
 	self.content = { milk = 0, cream = 0, coffee = 0 }
 	self.type = type
 	self.rsrc = rsrc
-	self.is_pouring = false
 end
 
 return Item
