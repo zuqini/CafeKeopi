@@ -71,7 +71,7 @@ end
 
 function printAmount(item)
 	local y = item.y
-	if not is_pouring then
+	if not is_pouring or item ~= grabbed_item then
 		y = y + item.rsrc:getHeight()
 	end
 	if item.amount == 0 then
@@ -181,7 +181,7 @@ function love.update(dt)
 		is_pouring = false
 	end
 
-	local item_to_remove = 0
+	local item_to_remove = nil
 	for i, item in ipairs(items) do
 		if item.y + 50 < TABLE_HEIGHT then
 			item.v = item.v + 1
@@ -205,7 +205,7 @@ function love.update(dt)
 			item_to_remove = i
 		end
 	end
-	if item_to_remove > 0 then
+	if item_to_remove then
 		earning_ratio = 100 - math.abs(items[item_to_remove].content.milk - request_content.milk) +
 			math.abs(items[item_to_remove].content.cream - request_content.cream) +
 			math.abs(items[item_to_remove].content.coffee - request_content.coffee)
